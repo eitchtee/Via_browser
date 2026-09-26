@@ -1,6 +1,6 @@
 # Via for Chrome and Firefox
 
-A browser extension client for [Via](../Via), the self-hosted way to send links, text and files
+A browser extension client for [Via](https://github.com/eitchtee/Via), the self-hosted way to send links, text and files
 between your devices.
 
 - **Receive**: links open in a new tab, text is copied to the clipboard, and files are saved to
@@ -58,7 +58,7 @@ A signed version can't be re-signed, so fix a broken release by tagging a new ve
 
 ## How it works
 
-The extension follows Via's [client guide](../Via/docs/clients.md):
+The extension follows Via's [client guide](https://github.com/eitchtee/Via/blob/main/docs/clients.md):
 
 - It registers as a device of type `browser` and stores only its device token.
 - The background keeps `GET /v1/inbox/events` open with `fetch()` (`EventSource` can't send the
@@ -116,6 +116,8 @@ src/
   offscreen/           Chrome-only clipboard helper
   icons/               copied from Via/branding (app-icon-small-16/32/48, app-icon-128); don't edit
 ```
+
+The icons come from [Via's branding folder](https://github.com/eitchtee/Via/tree/main/branding).
 
 ## License
 
