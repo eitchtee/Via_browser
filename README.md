@@ -24,6 +24,38 @@ On first install the setup page opens. Enter your server's address, allow the ex
 talk to it, sign in, and give this browser a name. The password is only used to register the
 device: the extension keeps the device token, never the password or a session.
 
+## Releasing
+
+Publish a GitHub release tagged with the version (`v1.2.0`; 1 to 4 numbers, no `-beta`
+suffixes). [`.github/workflows/release.yml`](.github/workflows/release.yml) builds both
+extensions with that version and attaches them to the release:
+
+| Asset | What it is |
+|---|---|
+| `via-chrome-<version>.zip` | Chrome / Edge package |
+| `via-firefox-<version>.xpi` | Firefox add-on, signed by Mozilla, installs by opening it in Firefox |
+| `updates.json` | Firefox update manifest |
+
+**Auto-updates**
+
+- **Firefox**: release builds point `update_url` at
+  `releases/latest/download/updates.json`, so installed copies check the latest release about
+  once a day and update themselves. This needs the repository secrets `AMO_JWT_ISSUER` and
+  `AMO_JWT_SECRET` (an API key from addons.mozilla.org → Developer Hub → *Manage API Keys*).
+  The add-on is signed as *unlisted*: it doesn't appear on AMO, and Mozilla signs it
+  automatically. Without the key, the release gets an unsigned zip that only loads as a
+  temporary add-on, and there are no updates.
+- **Chrome**: Chrome only auto-updates extensions from the Chrome Web Store. On Windows and
+  macOS it refuses to install packages from anywhere else unless an enterprise policy allows
+  it. Create the Web Store listing once by hand, then add the secrets `CWS_EXTENSION_ID`,
+  `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` and `CWS_REFRESH_TOKEN` (see
+  [chrome-webstore-upload's guide](https://github.com/fregante/chrome-webstore-upload-keys)).
+  Each release is then uploaded and submitted for review, and Chrome updates installed copies
+  once it's approved. Without these secrets, the zip is only for *Load unpacked*, which never
+  updates.
+
+A signed version can't be re-signed, so fix a broken release by tagging a new version.
+
 ## How it works
 
 The extension follows Via's [client guide](../Via/docs/clients.md):
