@@ -34,6 +34,7 @@ extensions with that version and attaches them to the release:
 |---|---|
 | `via-chrome-<version>.zip` | Chrome / Edge package |
 | `via-chromium-<version>.crx` | Signed package for Chromium browsers that allow installs from outside the Chrome Web Store |
+| `via-chromium-<version>-crx.zip` | The same `.crx`, zipped: Chromium browsers delete `.crx` downloads. Unzip it, then drag the `.crx` onto the browser's extensions page |
 | `updates.xml` | Update manifest for the `.crx` |
 | `via-firefox-<version>.xpi` | Firefox add-on, signed by Mozilla, installs by opening it in Firefox |
 | `updates.json` | Firefox update manifest |
@@ -63,7 +64,9 @@ extensions with that version and attaches them to the release:
   once it's approved. Without these secrets, the zip is only for *Load unpacked*, which never
   updates.
 
-A signed version can't be re-signed, so fix a broken release by tagging a new version.
+Mozilla signs each version only once, so fix a broken release by tagging a new version. To
+rebuild an existing release's assets with the current workflow, run *Actions → Release → Run
+workflow* with its tag: it keeps the signed `.xpi` and replaces the rest.
 
 ## How it works
 
