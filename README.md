@@ -33,6 +33,8 @@ extensions with that version and attaches them to the release:
 | Asset | What it is |
 |---|---|
 | `via-chrome-<version>.zip` | Chrome / Edge package |
+| `via-chromium-<version>.crx` | Signed package for Chromium browsers that allow installs from outside the Chrome Web Store |
+| `updates.xml` | Update manifest for the `.crx` |
 | `via-firefox-<version>.xpi` | Firefox add-on, signed by Mozilla, installs by opening it in Firefox |
 | `updates.json` | Firefox update manifest |
 
@@ -45,6 +47,13 @@ extensions with that version and attaches them to the release:
   The add-on is signed as *unlisted*: it doesn't appear on AMO, and Mozilla signs it
   automatically. Without the key, the release gets an unsigned zip that only loads as a
   temporary add-on, and there are no updates.
+- **Other Chromium browsers**: the `.crx` carries an `update_url` pointing at
+  `releases/latest/download/updates.xml`, so browsers that accept it keep it up to date. Google
+  Chrome on Windows and macOS won't install it (use the zip or the Web Store there). Other
+  browsers vary: Opera and Vivaldi, for example, install a `.crx` dragged onto their extensions
+  page. The package is signed with the `CRX_PRIVATE_KEY` secret, a PEM key made once with
+  `node scripts/crx.mjs keygen key.pem`. That key *is* the extension's identity: keep a backup,
+  and never replace it, or installed copies stop updating.
 - **Chrome**: Chrome only auto-updates extensions from the Chrome Web Store. On Windows and
   macOS it refuses to install packages from anywhere else unless an enterprise policy allows
   it. Create the Web Store listing once by hand, then add the secrets `CWS_EXTENSION_ID`,

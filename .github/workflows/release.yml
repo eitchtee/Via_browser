@@ -1,6 +1,9 @@
 # Builds both extensions when a release is published and attaches them to it.
 #
 #   via-chrome-<version>.zip     Chrome / Edge package (Load unpacked, or upload to the Web Store)
+#   via-chromium-<version>.crx   signed package for Chromium browsers that allow off-store
+#                                installs (e.g. Opera, Vivaldi); updates itself
+#   updates.xml                  Chromium update manifest for the .crx
 #   via-firefox-<version>.xpi    Firefox add-on signed by Mozilla (unlisted), installable directly
 #   updates.json                 Firefox update manifest; installed copies poll it and update
 #                                themselves from the latest release
@@ -9,6 +12,8 @@
 # browsers reject).
 #
 # Secrets (all optional; the matching step is skipped without them):
+#   CRX_PRIVATE_KEY                  PEM signing key for the .crx (`node scripts/crx.mjs keygen`).
+#                                    It fixes the extension ID: never change or lose it.
 #   AMO_JWT_ISSUER, AMO_JWT_SECRET   addons.mozilla.org API key. Without them, the Firefox build
 #                                    is attached as an unsigned zip that only loads temporarily.
 #   CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
@@ -35,6 +40,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
       CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
       CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
       CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -59,7 +65,8 @@ jobs:
 
       - name: Build
         env:
-          UPDATE_URL: https://github.com/${{ github.repository }}/releases/latest/download/updates.json
+          FIREFOX_UPDATE_URL: https://github.com/${{ github.repository }}/releases/latest/download/updates.json
+          CRX_UPDATE_URL: https://github.com/${{ github.repository }}/releases/latest/download/updates.xml
         run: node scripts/build.mjs
 
       - name: Lint the Firefox build
@@ -69,6 +76,15 @@ jobs:
         run: |
           mkdir -p out
           (cd dist/chrome && zip -qr "../../out/via-chrome-$VERSION.zip" .)
+
+      - name: Package Chromium (.crx)
+        if: env.CRX_PRIVATE_KEY != ''
+        env:
+          LINK: https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}
+        run: |
+          (cd dist/chromium && zip -qr "$RUNNER_TEMP/chromium.zip" .)
+          node scripts/crx.mjs pack "$RUNNER_TEMP/chromium.zip" "out/via-chromium-$VERSION.crx"
+          node scripts/crx.mjs update-xml out/updates.xml "$VERSION" "$LINK/via-chromium-$VERSION.crx"
 
       - name: Sign Firefox (unlisted, self-distributed)
         if: env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != ''
