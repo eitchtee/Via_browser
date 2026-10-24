@@ -33,10 +33,17 @@
     <section id="tab-send" role="tabpanel">
       <div id="send-home" class="options">
         <button class="option" data-kind="page">
-          <span class="option-icon" data-icon="link"></span>
+          <span class="option-icon" data-icon="browser"></span>
           <span class="grow">
             <span class="option-title">Send current page</span>
             <span id="page-hint" class="option-desc ellipsis">The page open in this tab</span>
+          </span>
+        </button>
+        <button class="option" data-kind="link">
+          <span class="option-icon" data-icon="link"></span>
+          <span class="grow">
+            <span class="option-title">Send link</span>
+            <span class="option-desc">Opens in the browser on the other device</span>
           </span>
         </button>
         <button class="option" data-kind="file">
@@ -66,9 +73,18 @@
           <span id="page-url" class="muted small ellipsis mono"></span>
         </div>
 
+        <div id="payload-link" class="fields" hidden>
+          <input type="url" id="link-url" placeholder="https://example.com" aria-label="Link to send" autocomplete="off" spellcheck="false">
+          <input type="text" id="link-title" placeholder="Title (optional)" aria-label="Title" autocomplete="off">
+          <div id="link-error" class="small field-error" hidden>Enter a web address, like example.com</div>
+        </div>
+
         <div id="payload-text" hidden>
           <textarea id="text" rows="5" placeholder="Type or paste text" aria-label="Text to send"></textarea>
-          <div id="text-count" class="muted small counter"></div>
+          <div class="row text-foot">
+            <span id="link-hint" class="grow small muted" hidden>Looks like a link. <button type="button" id="as-link" class="link-btn">Send as link</button></span>
+            <span id="text-count" class="muted small counter"></span>
+          </div>
         </div>
 
         <div id="payload-file" hidden>
