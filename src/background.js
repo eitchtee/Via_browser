@@ -4,6 +4,7 @@
 // everything whenever the browser suspends it.
 import { ApiError, call, client } from './lib/api.js';
 import { b } from './lib/browser.js';
+import { isWebUrl } from './lib/links.js';
 import { getConfig, getHistory, getPending, putHistory, setPending, updateConfig } from './lib/store.js';
 
 const ALARM = 'via-sync';
@@ -474,14 +475,6 @@ async function deviceName(cfg, deviceId) {
     }
   }
   return cache.names[deviceId] ?? null;
-}
-
-function isWebUrl(url) {
-  try {
-    return ['http:', 'https:'].includes(new URL(url).protocol);
-  } catch {
-    return false;
-  }
 }
 
 function hostOf(url) {

@@ -1,6 +1,7 @@
 import { call, client, errorText, uploadFile } from '../lib/api.js';
 import { b, isFirefox } from '../lib/browser.js';
 import { icon } from '../lib/icons.js';
+import { appendLinkified, isLinkInput, looksLikeLink, normalizeLink, singleLink } from '../lib/links.js';
 import { clearHistory, getConfig, getHistory, putHistory, updateConfig } from '../lib/store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -8,7 +9,7 @@ const params = new URLSearchParams(location.search);
 const standalone = params.has('view'); // opened in its own window (Firefox file picker)
 
 let cfg;
-let composing = null; // 'page' | 'file' | 'text'
+let composing = null; // 'page' | 'link' | 'file' | 'text'
 let tab = null;
 let files = [];
 
@@ -42,6 +43,9 @@ async function init() {
   $('select-all').onclick = toggleAll;
   $('text').oninput = updateTextCount;
   $('text').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send(); };
+  $('link-url').oninput = () => { $('link-error').hidden = true; updateSendButton(); };
+  $('link-url').onblur = () => { $('link-error').hidden = !$('link-url').value.trim() || isLinkInput($('link-url').value); };
+  $('as-link').onclick = textToLink;
   setupFileInput();
   $('clear-history').onclick = async () => { await clearHistory(); renderHistory(); };
 
@@ -72,8 +76,9 @@ async function openComposer(kind) {
     return;
   }
   composing = kind;
-  $('composer-title').textContent = { page: 'Send current page', file: 'Send file', text: 'Send text' }[kind];
+  $('composer-title').textContent = { page: 'Send current page', link: 'Send link', file: 'Send file', text: 'Send text' }[kind];
   $('payload-page').hidden = kind !== 'page';
+  $('payload-link').hidden = kind !== 'link';
   $('payload-text').hidden = kind !== 'text';
   $('payload-file').hidden = kind !== 'file';
   $('back').hidden = standalone;
@@ -85,6 +90,7 @@ async function openComposer(kind) {
   $('send-home').hidden = true;
   $('composer').hidden = false;
   if (kind === 'text') $('text').focus();
+  if (kind === 'link') $('link-url').focus();
   if (kind === 'file' && !files.length) $('file').click();
   updateSendButton();
 }
@@ -100,7 +106,16 @@ function updateTextCount() {
   const n = $('text').value.length;
   $('text-count').textContent = max ? `${n.toLocaleString()} / ${max.toLocaleString()}` : '';
   $('text-count').classList.toggle('over', Boolean(max && n > max));
+  $('link-hint').hidden = !looksLikeLink($('text').value);
   updateSendButton();
+}
+
+/** "Looks like a link": move the text over to the link composer. */
+function textToLink() {
+  $('link-url').value = $('text').value.trim();
+  $('text').value = '';
+  updateTextCount();
+  openComposer('link');
 }
 
 function setupFileInput() {
@@ -205,6 +220,7 @@ function updateSendButton() {
   if (composing === 'text') ready &&= $('text').value.trim().length > 0 && !$('text-count').classList.contains('over');
   if (composing === 'file') ready &&= files.length > 0 && files.every((f) => !cfg.limits?.max_file_size || f.size <= cfg.limits.max_file_size);
   if (composing === 'page') ready &&= Boolean(tab?.url);
+  if (composing === 'link') ready &&= isLinkInput($('link-url').value);
   $('send').disabled = !ready;
   const contacts = selectedTargets().filter((t) => t.startsWith('@')).length;
   const noun = contacts ? (n === 1 ? 'recipient' : 'recipients') : (n === 1 ? 'device' : 'devices');
@@ -222,6 +238,9 @@ async function send() {
   try {
     if (composing === 'page') {
       await api('/v1/pushes', { method: 'POST', json: { kind: 'link', url: tab.url, title: tab.title || null, to } });
+    } else if (composing === 'link') {
+      const url = normalizeLink($('link-url').value);
+      await api('/v1/pushes', { method: 'POST', json: { kind: 'link', url, title: $('link-title').value.trim() || null, to } });
     } else if (composing === 'text') {
       await api('/v1/pushes', { method: 'POST', json: { kind: 'note', body: $('text').value, to } });
     } else {
@@ -244,6 +263,7 @@ async function send() {
   setTimeout(() => {
     if (standalone) return window.close();
     if (composing === 'text') $('text').value = '';
+    if (composing === 'link') $('link-url').value = $('link-title').value = '';
     files = [];
     renderFiles();
     updateTextCount();
@@ -303,8 +323,10 @@ function historyEntry(h) {
     main.textContent = h.title || h.url;
     sub.textContent = h.url;
   } else if (h.kind === 'note') {
-    main.textContent = h.title || h.body;
-    if (h.title && h.body) sub.textContent = h.body;
+    const openLink = (url) => openFromHistory(h, url);
+    if (h.title) main.textContent = h.title;
+    else appendLinkified(main, h.body ?? '', openLink);
+    if (h.title && h.body) appendLinkified(sub, h.body, openLink);
     if (!h.title) main.classList.add('note');
   } else if (h.kind === 'file') {
     main.textContent = h.file?.name ?? 'File';
@@ -333,13 +355,11 @@ function historyEntry(h) {
   };
   if (h.kind === 'link' && /^https?:/i.test(h.url ?? '')) {
     action('copy', 'Copy link', (e) => copy(e.currentTarget, h.url));
-    action('open', 'Open', async () => {
-      await b.tabs.create({ url: h.url });
-      if (h.status === 'received') await putHistory({ id: h.id, status: 'opened' });
-      window.close();
-    });
+    action('open', 'Open', () => openFromHistory(h, h.url));
   } else if (h.kind === 'note') {
     action('copy', 'Copy text', (e) => copy(e.currentTarget, h.body ?? h.title ?? ''));
+    const link = singleLink(h.body ?? h.title);
+    if (link) action('open', 'Open link', () => openFromHistory(h, link));
   } else if (h.kind === 'file' && h.status === 'downloaded' && h.downloadId != null) {
     action('folder', 'Show in folder', () => b.downloads.show(h.downloadId));
   } else if (h.kind === 'file' && h.status === 'failed') {
@@ -349,6 +369,12 @@ function historyEntry(h) {
     });
   }
   return li;
+}
+
+async function openFromHistory(h, url) {
+  await b.tabs.create({ url });
+  if (h.kind === 'link' && h.status === 'received') await putHistory({ id: h.id, status: 'opened' });
+  window.close();
 }
 
 async function copy(btn, text) {
